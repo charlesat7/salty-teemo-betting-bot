@@ -2,6 +2,7 @@ import socket, re, time, sys
 from functions_general import *
 import cron
 import thread
+import time
 
 class irc:
 	
@@ -39,7 +40,10 @@ class irc:
 			return True
 
 	def send_message(self, channel, message):
-		self.sock.send(b'PRIVMSG %s :%s\r\n' % (channel, message.encode('utf-8')))
+		# Do three times, just in case.
+		for x in range(3):
+			time.sleep(0.1)
+			self.sock.send(b'PRIVMSG %s :%s\r\n' % (channel, message.encode('utf-8')))
 
 	def get_irc_socket_object(self):
 		sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
