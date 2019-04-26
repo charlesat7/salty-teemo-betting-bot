@@ -1,69 +1,72 @@
-Roboraj
+Salty Teemo Betting Bot
 ==========
 
-This is a simple Twitch chat/irc bot written in python.
+This is a fork of the twitch-bot made by aidanrwt: https://github.com/aidanrwt/twitch-bot
+It is a simple Twitch chat/irc bot written in Python 2.7.16, modified to interact with the Salty Teemo channel.
 
-
-Installation
+Getting Started
 ============
-* Open up your terminal/shell of choice.
-* Install the [http://docs.python-requests.org/en/latest/](Requests library) if you haven't already using `pip install requests`. I tested this application on Python 2.7.5.
-* 
-* Clone the Git repository.
-* Move config/config_example.py to config/config.py. Replace all of the placeholders there with your own username/oauth token/channels to join etc (tips are given in the file).
-* Type `chmod +x /serve.py`. To run, you simply need to execute the file by typing `./serve.py`.
-
+* Ensure your system has Python 2.7 installed: `python --version`
+* Install the `requests` package: `pip install requests`
+* Clone the Git repository: `git clone https://github.com/knakamura13/salty-teemo-betting-bot`
+* Replace all of the placeholders in `config.py` with your own username, oauth token, channels, etc.
+* Make the serve.py script executable: `chmod +x /serve.py`
+* Run the serve.py script: `./serve.py` or `python serve.py`
 
 Adding your own commands
 ========================
 
-You're going to need to know basic Python if you want to add your own commands. Open up `lib/command_headers.py`. There are examples of pre-made commands in there as examples. The limit parameter is the amount of times a command can be used in seconds, if you don't want a limit to be enforced put in 0.
+Custom commands should be added to: `lib/command_headers.py`. 
+These are commands that the bot will listen for and respond to accordingly.
+There are examples already in `command_headers.py` for you to look at.
 
-If your command is only going to return a string, ex - `!hello` returns `Welcome!`, don't include the `argc` parameter. Place the string you wish to be returned to the user in the `return` parameter. For example, if you wanted to create a command such as this and limit it to being used ever 30 seconds, you would add in:
+#### Simple Commands
+The `limit` parameter is the minimum time between uses that you want to allow for that command.
+If your command is only going to return a string, such as the `!hello` command, don't include the `argc` parameter. 
+Place the string you wish to be returned to the user in the `return` parameter. This is what the bot will type in the Twitch chat for everyone to see.
 
 ```python
 '!hello': {
-		'limit': 10,
-		'return': 'Welcome!'
+	'limit': 10,
+	'return': 'Hello from the Python code!'
 }
 ```
 
-However, if your command has to have some logic implemented and if the command is just going to return whatever a function returns, set the `return` parameter on the command to `command`, and set `argc` to `0`. If your command is going to take arguments, ex `!hello <name>`, set argc to `1` or however many arguments the command is going to take in.
+#### Complex Commands (functions)
+Let's say we want a command which will take two arguments and perform logic based on the arguments. 
+The command is `!rand` and it will take a `minimum` and `maximum` argument. We will limit this command to be used once every 10 seconds.
 
-Make a new file in `lib/commands/` and give the filename `command.py` where command is the command name. If your `argc` was set to `0`, don't include `args` in the functions parameters, else set the only parameter to `args`. Args will contain a list of whatever arguments were passed to the command.
-
-This command will contain whatever logic needs to be carried out. You should validate the arguments in there. After you have the response that you want a user to see, just `return` it.
-
-Let's say we want to add a command which will take two arguments, we will call it `!random` and it will take a `minimum` and `maximum` argument. We will limit this command to be allowed to be called every 20 seconds.
-
-Add the following to the `commands` dictionary:
+This command is already created for you:
 
 ```python
-'!random': {
-		'limit': 20,
+'!rand': {
+		'limit': 10,
 		'argc': 2,
 		'return': 'command'
 }
 ```
 
-And then in `lib/commands/random.py` , write the following: 
+And then in `lib/commands/_rand.py`, you will find the following: 
 
 ```python
 import random
 
-def random(args):
-  min = args[0]
-  max = args[1]
-    
-  usage = '!random <min> <max>'
-  
-  # carry out validation
-  try:
-    return ranrange(min, max)
-  except ValueError:
-    return '!random <min> <max> (use full integers)'
-  except:
-    return usage
+def _rand(args):
+	min = int(args[0])
+	max = int(args[1])
+	
+	try:
+		return '%s' % random.randint(min, max)
+	except ValueError:
+		return '!random <min> <max> (use full integers)'
+	except:
+		return '!random <min> <max>'
 ```
 
-And now if somebody types `!random 5 10` into the chat, the bot will respond with a pseudo-random number between 5 and 10.
+Now, if a user types `!rand 5 10` into the Twitch chat, the bot will respond with a number between 5 and 10.
+
+
+Betting in Salty Teemo
+======================
+
+Betting is handled by the file `bot.py`.
