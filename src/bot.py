@@ -56,7 +56,6 @@ class Main:
 				x = lower['amt']
 				print x
 				if x > 0:
-					# y = 3000 * math.log10((x+20000) / 10000)	# Min 1,000; 	Max ~5,000
 					y = 2000 * math.log10(x + 20000) - 8300		# Min 400;		Max ~3,000
 					print 'log10 okay: x=%s, y=%s' % (x, y)
 				else:
