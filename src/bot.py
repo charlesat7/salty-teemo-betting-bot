@@ -1,54 +1,91 @@
-"""
-Simple IRC Bot for Twitch.tv
-
-Developed by Aidan Thomson <aidraj0@gmail.com>
-"""
-
+import os
 import time
+import math
+import random
 import lib.irc as irc_
+from datetime import datetime
+from subprocess import Popen, PIPE
 from lib.functions_general import *
 import lib.functions_commands as commands
 
-class Roboraj:
-
+class Main:
 	def __init__(self, config):
 		self.config = config
 		self.irc = irc_.irc(config)
 		self.socket = self.irc.get_irc_socket_object()
-
-	def createCustomResponseForUser(self, channel, username, _username, message, _message, _response, irc):
-		if (username == _username and _message in message):
-			time.sleep(2)
-			irc.send_message(channel, _response)
 
 	def run(self):
 		irc = self.irc
 		sock = self.socket
 		config = self.config
 
-		# Initialize current bet stats per team.
-		totals = {}
-		totals['blue_amt'] = 0
-		totals['blue_bets'] = 0
-		totals['red_amt'] = 0
-		totals['red_bets'] = 0
+		# Initialize reusable properties.
+		totals = {'blue_amt': 0, 'blue_bets': 0, 'red_amt': 0, 'red_bets': 0}
+		timers = {'!collect': time.time(), 'first_bet': time.time()}
+		higher = lower = {}
+		bet_complete = False
+		betting_started = False
+
+		if config['log_statistics']:
+			f = open(config['statistics_file'], 'a+')
+
+		prev_time_int = 0
 
 		while True:
-			data = sock.recv(config['socket_buffer_size']).rstrip()
+			time_since_collect = int(time.time() - timers['!collect'])
+			time_since_first_bet = int(time.time() - timers['first_bet'])
 
+			# Check if 60 minutes has passed yet.
+			if time_since_collect > 3600:
+				irc.send_message(channel, '!collect')
+				timers['!collect'] = time.time()
+
+			# Wait until 170 seconds has passed to bet.
+			if time_since_first_bet >= 170 and betting_started and not bet_complete:
+				# Check which team is in the lead.
+				blue = {'name': 'blue', 'amt': totals['blue_amt'], 'bets': totals['blue_bets']}
+				red = {'name': 'red', 'amt': totals['red_amt'], 'bets': totals['red_bets']}
+				if (red['amt'] > blue['amt']):
+					higher = red
+					lower = blue
+				else:
+					higher = blue
+					lower = red
+
+				# Quick mafs.
+				x = lower['amt']
+				print x
+				if x > 0:
+					# y = 3000 * math.log10((x+20000) / 10000)	# Min 1,000; 	Max ~5,000
+					y = 2000 * math.log10(x + 20000) - 8300		# Min 400;		Max ~3,000
+					print 'log10 okay: x=%s, y=%s' % (x, y)
+				else:
+					y = random.randint(500, 1500)
+					print 'Using random int: x=%s, y=%s' % (x, y)
+
+				# Bet on the underdog.
+				underdog = lower['name']
+				bet = int(y)
+
+				# Send the message and record the bet.
+				irc.send_message(channel, '!%s %s' % (underdog, bet))
+				print 'Bet complete: !%s %s\n' % (underdog, bet)
+				bet_complete = True
+				betting_started = False
+
+			data = sock.recv(2048).rstrip()
+
+			# Check if the script is still connected to IRC.
 			if len(data) == 0:
-				pp('Connection was lost, reconnecting.')
+				pp('Connection was lost, reconnecting...')
 				sock = self.irc.get_irc_socket_object()
 
-			if config['debug']:
-				print data
-
-			# check for ping, reply with pong
+			# Check for PING; reply with PONG.
 			irc.check_for_ping(data)
 
+			# Check if most recent data is a message from Twitch chat.
 			if irc.check_for_message(data):
 				message_dict = irc.get_message(data)
-
 				channel = message_dict['channel']
 				message = message_dict['message']
 				username = message_dict['username']
@@ -57,130 +94,107 @@ class Roboraj:
 				#######################################
 				# Handle messages sent by other users #
 				#######################################
-
-				if (username != 'chuby1tubby'):
-					# Message was sent by @RyuOz.
-					self.createCustomResponseForUser(channel, username, 'ryuoz', message, '!beemo', '@RyuOz reminds you to always bet on beemo. <3', irc)
-
-					# Message was sent by @Sangokaku.
-					self.createCustomResponseForUser(channel, username, 'sangokaku', message, '!test', 'Oh hi there @Sangokaku VoHiYo', irc)
-					self.createCustomResponseForUser(channel, username, 'sangokaku', message, '!balance', '@Sangokaku Show off DansGame', irc)
-
+				if username != config['username']:
 					# Message was sent by @xxsaltbotxx.
-					if (username == 'xxsaltbotxx'):
+					if username == 'xxsaltbotxx':
 						# Message contains 'bet complete for'.
-						if ('Bet complete for' in message):
-							# Parse values from Salt Bot's message.
-							split = message.split(' - Bet complete for ')
-							usr = split[0]
-							split = split[1].split(', ')
-							team = split[0].lower()
-							amt = int(split[1].split('.')[0])
+						if 'Bet complete' in message:
+							# This is the first bet of the game.
+							if (totals['blue_amt'] == 0 and totals['red_amt'] == 0):
+								timers['first_bet'] = time.time()
+								time_since_first_bet = 0
+								betting_started = True
 
-							# Copy shellfish's bet.
-							if ('you_are_being_shellfish' in message):
-								# Use (n)% of shellfish's bet.
-								n = 50
-								amt = int(amt * n/100)
+								# Set focus to the Twitch tab in Chrome.
+								apple_script = '''
+									tell application "Google Chrome"
+										activate
+										set active tab index of first window to 2
+									end tell
+								'''
+								p = Popen(['osascript', '-'], stdin=PIPE, stdout=PIPE, stderr=PIPE)
+								stdout, stderr = p.communicate(apple_script)
 
-								# Wait (t) seconds.
-								t = 5
-								time.sleep(t)
+							# Parse values from xxsaltbotxx's message.
+							split = message.split(' - Bet complete for ')[1].split(', ')
+							team = split[0].lower()				# Team name.
+							amt = int(split[1].split('.')[0])	# Bet amount.
 
-								# Send a message. Ex: !blue 100
-								irc.send_message(channel, '!%s %s' % (team, amt))
-
-								# Wait (t) second.
-								time.sleep(t)
-
-								# Send a message. Ex: !collect
-								irc.send_message(channel, '!collect')
-
-								# Log information to the console.
-								print('\n\nSHELLFISH BET (%s) (%s)\n' % (team, amt))
+							# Increment totals each time a user bets.
+							if (team == 'blue'):
+								totals['blue_amt'] += amt
+								totals['blue_bets'] += 1
 							else:
-								# Increment totals each time a user bets.
-								if (team == 'blue'):
-									totals['blue_amt'] += amt
-									totals['blue_bets'] += 1
+								totals['red_amt'] += amt
+								totals['red_bets'] += 1
+
+							print 'Time since first bet: %s s' % time_since_first_bet
+							print 'Blue: \t%s shrooms, %s bets' % ("{:,}".format(totals['blue_amt']), totals['blue_bets'])
+							print 'Red: \t%s shrooms, %s bets\n' % ("{:,}".format(totals['red_amt']), totals['red_bets'])
+
+						# Message contains 'Betting has ended' or over 3 minutes has passed.
+						if 'Betting has ended' in message or time_since_first_bet >= 210:
+							if totals['blue_amt'] != 0 and totals['red_amt'] != 0:
+								if 'name' not in lower:
+									lower['name'] = 'UNKNOWN'
+
+								# Log data to a text file.
+								d = datetime.now().strftime('%Y-%m-%d')
+								t = datetime.now().strftime('%I:%M%p')
+								new_row = '\n%s\t| %s\t| %s  \t\t| %s \t\t| %s  \t\t| %s \t\t| %s     \t\t| %s \t\t| ' % (d, t, totals['blue_amt'], totals['blue_bets'], totals['red_amt'], totals['red_bets'], bet, lower['name'])
+								f.write(new_row)
+								f.flush()
+
+								# Set all globals back to zero.
+								totals = {'blue_amt': 0, 'blue_bets': 0, 'red_amt': 0, 'red_bets': 0}
+								timers['first_bet'] = 0
+								time_since_first_bet = 0
+								bet_complete = False
+								betting_started = False
+
+								print 'Betting has ended\n'
+
+
+				########################################
+				# Handle messages sent by your account #
+				########################################
+
+				if username == config['username']:
+					if config['log_messages']:
+						ppi(channel, message, username)
+
+					# Check if the message is a command (i.e. starts with "!{command}").
+					if commands.is_valid_command(message) or commands.is_valid_command(message.split(' ')[0]):
+						command = message
+
+						# Command is a function (i.e. command should execute a script in the /src/lib/commands/ directory).
+						if commands.check_returns_function(command.split(' ')[0]):
+							if commands.check_has_correct_args(command, command.split(' ')[0]):
+								args = command.split(' ')
+								del args[0]
+								command = command.split(' ')[0]
+
+								if commands.is_on_cooldown(command, channel):
+									pbot('Command is on cooldown. (%s) (%s) (%ss remaining)' % (command, username, commands.get_cooldown_remaining(command, channel)), channel)
 								else:
-									totals['red_amt'] += amt
-									totals['red_bets'] += 1
+									# Command (function) is not on cooldown, so send a message to Twitch chat.
+									pbot('(%s) (%s)' % (command, username), channel)
+									result = commands.pass_to_function(command, args)
 
-								# Log information to the console.
-								print('\nBlue: \t%s mushrooms with %s bets.' % (totals['blue_amt'], totals['blue_bets']))
-								print('Red: \t%s mushrooms with %s bets.' % (totals['red_amt'], totals['red_bets']))
+									if result:
+										# Function returned a valid result.
+										pbot(result, channel)
+										irc.send_message(channel, result)
+										commands.update_last_used(command, channel)
 
-						# Message contains 'Betting has ended'.
-						if ('Betting has ended' in message):
-							if (totals['blue_amt'] != 0 and totals['red_amt'] != 0):
-								# Set all totals back to zero.
-								totals['blue_amt'] = 0
-								totals['blue_bets'] = 0
-								totals['red_amt'] = 0
-								totals['red_bets'] = 0
-
-								# Log information to the console.
-								print('BETTING HAS ENDED')
-
-					# Skip the rest of this loop iteration.
-					continue
-
-
-				##########################################
-				# Handle commands sent by my own account #
-				##########################################
-
-				ppi(channel, message, username)
-
-				# check if message is a command with no arguments
-				if commands.is_valid_command(message) or commands.is_valid_command(message.split(' ')[0]):
-					command = message
-
-					if commands.check_returns_function(command.split(' ')[0]):
-						if commands.check_has_correct_args(command, command.split(' ')[0]):
-							args = command.split(' ')
-							del args[0]
-
-							command = command.split(' ')[0]
-
+						# Command is not a function and has no arguments (i.e. a simple command with a simple response, such as "!test").
+						else:
 							if commands.is_on_cooldown(command, channel):
-								pbot('Command is on cooldown. (%s) (%s) (%ss remaining)' % (
-									command, username, commands.get_cooldown_remaining(command, channel)), 
-									channel
-								)
-							else:
-								pbot('Command is valid an not on cooldown. (%s) (%s)' % (
-									command, username), 
-									channel
-								)
-								
-								result = commands.pass_to_function(command, args)
+								pbot('Command is on cooldown. (%s) (%s) (%ss remaining)' % (command, username, commands.get_cooldown_remaining(command, channel)), channel)
+							elif commands.check_has_return(command):
+								# Command is not on cooldown, so send a message to Twitch chat.
+								pbot('(%s) (%s)' % (command, username), channel)
+								res = commands.get_return(command)
+								pbot(res, channel)
+								irc.send_message(channel, res)
 								commands.update_last_used(command, channel)
-
-								if result:
-									resp = '%s' % (result)
-									pbot(resp, channel)
-
-									time.sleep(1)
-									irc.send_message(channel, resp)
-
-					else:
-						if commands.is_on_cooldown(command, channel):
-							pbot('Command is on cooldown. (%s) (%s) (%ss remaining)' % (
-									command, username, commands.get_cooldown_remaining(command, channel)), 
-									channel
-							)
-						elif commands.check_has_return(command):
-							pbot('Command is valid and not on cooldown. (%s) (%s)' % (
-								command, username), 
-								channel
-							)
-							commands.update_last_used(command, channel)
-							resp = '%s' % (commands.get_return(command))
-							commands.update_last_used(command, channel)
-
-							pbot(resp, channel)
-
-							time.sleep(1)
-							irc.send_message(channel, resp)

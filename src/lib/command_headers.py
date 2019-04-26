@@ -2,23 +2,25 @@ from src.config.config import *
 
 commands = {
 	'!test': {
-		'limit': 0,
-		'return': 'I hear you, @Chuby1Tubby. MrDestructoid'
+		'limit': 5,
+		'return': '@%s I hear you MrDestructoid' % config['username']
 	},
-
-	'!sango': {
-		'limit': 30,
-		'return': 'Sango-Kaku, or Coral-Bark Maple, is a type of Japanese maple tree with pinkish-red bark.'
-	},
-
 	'!beemo': {
-		'limit': 30,
-		'return': '/me Teemo reminds you to bee smart with your mushrooms. CosmicBrain'
+		'limit': 5,
+		'return': '@Chuby1Tubby Fact: beemo is the cutest champion in the whole world <3.'
+	},
+	'!catfact': {
+		'limit': 10,
+		'argc': 0,
+		'return': 'command'
+	},
+	'!rand': {
+		'limit': 10,
+		'argc': 2,
+		'return': 'command'
 	}
 }
 
-
 for channel in config['channels']:
 	for command in commands:
-		commands[command][channel] = {}
-		commands[command][channel]['last_used'] = 0
+		commands[command][channel] = {'last_used': 0}
