@@ -8,6 +8,7 @@ from subprocess import Popen, PIPE
 from lib.functions_general import *
 import lib.functions_commands as commands
 
+
 class Main:
 	def __init__(self, config):
 		self.config = config
@@ -25,6 +26,8 @@ class Main:
 		higher = lower = {}
 		bet_complete = False
 		betting_started = False
+		bet = 0
+		verbalAlert = True
 
 		if config['log_statistics']:
 			f = open(config['statistics_file'], 'a+')
@@ -36,12 +39,12 @@ class Main:
 			time_since_first_bet = int(time.time() - timers['first_bet'])
 
 			# Check if 60 minutes has passed yet.
-			if time_since_collect > 3600:
+			if time_since_collect > 10800:
 				irc.send_message(channel, '!collect')
 				timers['!collect'] = time.time()
 
-			# Wait until 170 seconds has passed to bet.
-			if time_since_first_bet >= 170 and betting_started and not bet_complete:
+			# Wait until 160 seconds has passed to bet.
+			if time_since_first_bet >= 160 and betting_started and not bet_complete:
 				# Check which team is in the lead.
 				blue = {'name': 'blue', 'amt': totals['blue_amt'], 'bets': totals['blue_bets']}
 				red = {'name': 'red', 'amt': totals['red_amt'], 'bets': totals['red_bets']}
@@ -52,23 +55,23 @@ class Main:
 					higher = blue
 					lower = red
 
-				# Quick mafs.
 				x = lower['amt']
-				print x
-				if x > 0:
-					y = 2000 * math.log10(x + 20000) - 8300		# Min 400;		Max ~3,000
-					print 'log10 okay: x=%s, y=%s' % (x, y)
-				else:
-					y = random.randint(500, 1500)
-					print 'Using random int: x=%s, y=%s' % (x, y)
+				y = x / 20
+				print("x, y")
+				print("%s, %s" % (x,y))
+				if y < 500:
+					y = random.randint(500, 800)
+				elif y >= 1500:
+					y = random.randint(1200, 1500)
 
-				# Bet on the underdog.
-				underdog = lower['name']
 				bet = int(y)
+				team = lower['name']
 
 				# Send the message and record the bet.
-				irc.send_message(channel, '!%s %s' % (underdog, bet))
-				print 'Bet complete: !%s %s\n' % (underdog, bet)
+				irc.send_message(channel, '!%s %s' % (team, bet))
+				print(
+					'--------------------------------\nBET COMPLETE: !%s %s\n--------------------------------'
+					% (team, bet))
 				bet_complete = True
 				betting_started = False
 
@@ -89,15 +92,18 @@ class Main:
 				message = message_dict['message']
 				username = message_dict['username']
 
-
 				#######################################
 				# Handle messages sent by other users #
 				#######################################
+
 				if username != config['username']:
 					# Message was sent by @xxsaltbotxx.
 					if username == 'xxsaltbotxx':
 						# Message contains 'bet complete for'.
 						if 'Bet complete' in message:
+							if '@Chuby1Tubby' in message:
+								bet_complete = True
+
 							# This is the first bet of the game.
 							if (totals['blue_amt'] == 0 and totals['red_amt'] == 0):
 								timers['first_bet'] = time.time()
@@ -112,12 +118,16 @@ class Main:
 									end tell
 								'''
 								p = Popen(['osascript', '-'], stdin=PIPE, stdout=PIPE, stderr=PIPE)
-								stdout, stderr = p.communicate(apple_script)
+								p.communicate(apple_script)
+
+								# Verbally notify that a game has started.
+								if verbalAlert:
+									Popen('say a game is starting'.split())
 
 							# Parse values from xxsaltbotxx's message.
 							split = message.split(' - Bet complete for ')[1].split(', ')
-							team = split[0].lower()				# Team name.
-							amt = int(split[1].split('.')[0])	# Bet amount.
+							team = split[0].lower()  # Team name.
+							amt = int(split[1].split('.')[0])  # Bet amount.
 
 							# Increment totals each time a user bets.
 							if (team == 'blue'):
@@ -127,9 +137,11 @@ class Main:
 								totals['red_amt'] += amt
 								totals['red_bets'] += 1
 
-							print 'Time since first bet: %s s' % time_since_first_bet
-							print 'Blue: \t%s shrooms, %s bets' % ("{:,}".format(totals['blue_amt']), totals['blue_bets'])
-							print 'Red: \t%s shrooms, %s bets\n' % ("{:,}".format(totals['red_amt']), totals['red_bets'])
+							print('Time since first bet: %s s' % time_since_first_bet)
+							print('Blue: \t%s shrooms, %s bets' %
+													("{:,}".format(totals['blue_amt']), totals['blue_bets']))
+							print('Red: \t%s shrooms, %s bets\n' %
+													("{:,}".format(totals['red_amt']), totals['red_bets']))
 
 						# Message contains 'Betting has ended' or over 3 minutes has passed.
 						if 'Betting has ended' in message or time_since_first_bet >= 210:
@@ -140,7 +152,9 @@ class Main:
 								# Log data to a text file.
 								d = datetime.now().strftime('%Y-%m-%d')
 								t = datetime.now().strftime('%I:%M%p')
-								new_row = '\n%s\t| %s\t| %s  \t\t| %s \t\t| %s  \t\t| %s \t\t| %s     \t\t| %s \t\t| ' % (d, t, totals['blue_amt'], totals['blue_bets'], totals['red_amt'], totals['red_bets'], bet, lower['name'])
+								new_row = '\n%s\t| %s\t| %s  \t\t| %s \t\t| %s  \t\t| %s \t\t| %s     \t\t| %s \t\t| ' % (
+									d, t, totals['blue_amt'], totals['blue_bets'], totals['red_amt'],
+									totals['red_bets'], bet, lower['name'])
 								f.write(new_row)
 								f.flush()
 
@@ -151,8 +165,7 @@ class Main:
 								bet_complete = False
 								betting_started = False
 
-								print 'Betting has ended\n'
-
+								print('Betting has ended\n')
 
 				########################################
 				# Handle messages sent by your account #
@@ -161,6 +174,17 @@ class Main:
 				if username == config['username']:
 					if config['log_messages']:
 						ppi(channel, message, username)
+
+					if '!mute' in message:
+						print('Alerts muted.')
+						verbalAlert = False
+					elif '!unmute' in message:
+						print('Alerts unmuted.')
+						verbalAlert = True
+
+					if '!skip' in message:
+						bet_complete = True
+						irc.send_message(channel, '@chuby1tubby Betting paused until next round.')
 
 					# Check if the message is a command (i.e. starts with "!{command}").
 					if commands.is_valid_command(message) or commands.is_valid_command(message.split(' ')[0]):
@@ -174,7 +198,9 @@ class Main:
 								command = command.split(' ')[0]
 
 								if commands.is_on_cooldown(command, channel):
-									pbot('Command is on cooldown. (%s) (%s) (%ss remaining)' % (command, username, commands.get_cooldown_remaining(command, channel)), channel)
+									pbot('Command is on cooldown. (%s) (%s) (%ss remaining)' %
+														(command, username,
+															commands.get_cooldown_remaining(command, channel)), channel)
 								else:
 									# Command (function) is not on cooldown, so send a message to Twitch chat.
 									pbot('(%s) (%s)' % (command, username), channel)
@@ -189,7 +215,9 @@ class Main:
 						# Command is not a function and has no arguments (i.e. a simple command with a simple response, such as "!test").
 						else:
 							if commands.is_on_cooldown(command, channel):
-								pbot('Command is on cooldown. (%s) (%s) (%ss remaining)' % (command, username, commands.get_cooldown_remaining(command, channel)), channel)
+								pbot('Command is on cooldown. (%s) (%s) (%ss remaining)' %
+													(command, username,
+														commands.get_cooldown_remaining(command, channel)), channel)
 							elif commands.check_has_return(command):
 								# Command is not on cooldown, so send a message to Twitch chat.
 								pbot('(%s) (%s)' % (command, username), channel)
@@ -197,3 +225,4 @@ class Main:
 								pbot(res, channel)
 								irc.send_message(channel, res)
 								commands.update_last_used(command, channel)
+
