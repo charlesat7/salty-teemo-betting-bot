@@ -8,7 +8,6 @@ from subprocess import Popen, PIPE
 from lib.functions_general import *
 import lib.functions_commands as commands
 
-
 class Main:
 	def __init__(self, config):
 		self.config = config
@@ -39,7 +38,7 @@ class Main:
 			time_since_first_bet = int(time.time() - timers['first_bet'])
 
 			# Check if 60 minutes has passed yet.
-			if time_since_collect > 10800:
+			if time_since_collect > 3600:
 				irc.send_message(channel, '!collect')
 				timers['!collect'] = time.time()
 
@@ -57,8 +56,6 @@ class Main:
 
 				x = lower['amt']
 				y = x / 20
-				print("x, y")
-				print("%s, %s" % (x,y))
 				if y < 500:
 					y = random.randint(500, 800)
 				elif y >= 1500:
@@ -130,7 +127,7 @@ class Main:
 							amt = int(split[1].split('.')[0])  # Bet amount.
 
 							# Increment totals each time a user bets.
-							if (team == 'blue'):
+							if team == 'blue':
 								totals['blue_amt'] += amt
 								totals['blue_bets'] += 1
 							else:
@@ -176,14 +173,15 @@ class Main:
 						ppi(channel, message, username)
 
 					if '!mute' in message:
-						print('Alerts muted.')
 						verbalAlert = False
+						print('Alerts muted.')
 					elif '!unmute' in message:
-						print('Alerts unmuted.')
 						verbalAlert = True
+						print('Alerts unmuted.')
 
 					if '!skip' in message:
 						bet_complete = True
+						print('Skipping the current round.')
 						irc.send_message(channel, '@chuby1tubby Betting paused until next round.')
 
 					# Check if the message is a command (i.e. starts with "!{command}").
