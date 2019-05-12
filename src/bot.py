@@ -25,7 +25,8 @@ class Main:
 		higher = lower = {}
 		bet_complete = False
 		betting_started = False
-		bet = 0
+		my_bet = 0
+		my_team = ''
 		verbalAlert = True
 
 		if config['log_statistics']:
@@ -47,7 +48,7 @@ class Main:
 				# Check which team is in the lead.
 				blue = {'name': 'blue', 'amt': totals['blue_amt'], 'bets': totals['blue_bets']}
 				red = {'name': 'red', 'amt': totals['red_amt'], 'bets': totals['red_bets']}
-				if (red['amt'] > blue['amt']):
+				if red['amt'] > blue['amt']:
 					higher = red
 					lower = blue
 				else:
@@ -61,14 +62,14 @@ class Main:
 				elif y >= 1500:
 					y = random.randint(1200, 1500)
 
-				bet = int(y)
-				team = lower['name']
+				my_bet = int(y)
+				my_team = lower['name']
 
 				# Send the message and record the bet.
-				irc.send_message(channel, '!%s %s' % (team, bet))
+				irc.send_message(channel, '!%s %s' % (my_team, my_bet))
 				print(
 					'--------------------------------\nBET COMPLETE: !%s %s\n--------------------------------'
-					% (team, bet))
+					% (my_team, my_bet))
 				bet_complete = True
 				betting_started = False
 
@@ -98,24 +99,42 @@ class Main:
 					if username == 'xxsaltbotxx':
 						# Message contains 'bet complete for'.
 						if 'Bet complete' in message:
-							if '@Chuby1Tubby' in message:
-								bet_complete = True
-
 							# This is the first bet of the game.
-							if (totals['blue_amt'] == 0 and totals['red_amt'] == 0):
+							if totals['blue_amt'] == 0 and totals['red_amt'] == 0:
 								timers['first_bet'] = time.time()
 								time_since_first_bet = 0
 								betting_started = True
 
 								# Set focus to the Twitch tab in Chrome.
-								apple_script = '''
+								p = Popen(['osascript', '-'], stdin=PIPE, stdout=PIPE, stderr=PIPE)
+								p.communicate('''
 									tell application "Google Chrome"
 										activate
 										set active tab index of first window to 2
 									end tell
-								'''
-								p = Popen(['osascript', '-'], stdin=PIPE, stdout=PIPE, stderr=PIPE)
-								p.communicate(apple_script)
+								''')
+
+								# Send a message using Messages.app.
+								args = [
+									'6262099242',
+									'{} - A new game has started!'.format(datetime.now().strftime("%I:%M %p"))
+								]
+								p_message = Popen(
+									['osascript', '-'] + args,
+									stdin=PIPE,
+									stdout=PIPE,
+									stderr=PIPE,
+									universal_newlines=True
+								)
+								p_message.communicate('''
+									on run {targetBuddyPhone, targetMessage}
+										tell application "Messages"
+											set targetService to 1st service whose name = "SMS"
+											set targetBuddy to buddy targetBuddyPhone of targetService
+											send targetMessage to targetBuddy
+										end tell
+									end run
+								''')
 
 								# Verbally notify that a game has started.
 								if verbalAlert:
@@ -140,20 +159,35 @@ class Main:
 							print('Red: \t%s shrooms, %s bets\n' %
 													("{:,}".format(totals['red_amt']), totals['red_bets']))
 
-						# Message contains 'Betting has ended' or over 3 minutes has passed.
-						if 'Betting has ended' in message or time_since_first_bet >= 210:
-							if totals['blue_amt'] != 0 and totals['red_amt'] != 0:
-								if 'name' not in lower:
-									lower['name'] = 'UNKNOWN'
+							# The bet was made by myself.
+							if '@Chuby1Tubby' in message:
+								bet_complete = True
+								betting_started = False
+								my_team = team
+								my_bet = amt
 
+						# Message contains 'Betting has ended' or over 3 minutes has passed.
+						if 'Betting has ended' in message or time_since_first_bet >= 240:
+							if totals['blue_amt'] != 0 and totals['red_amt'] != 0:
 								# Log data to a text file.
-								d = datetime.now().strftime('%Y-%m-%d')
-								t = datetime.now().strftime('%I:%M%p')
-								new_row = '\n%s\t| %s\t| %s  \t\t| %s \t\t| %s  \t\t| %s \t\t| %s     \t\t| %s \t\t| ' % (
-									d, t, totals['blue_amt'], totals['blue_bets'], totals['red_amt'],
-									totals['red_bets'], bet, lower['name'])
-								f.write(new_row)
-								f.flush()
+								# d = datetime.now().strftime('%Y-%m-%d')
+								# t = datetime.now().strftime('%I:%M%p')
+								# new_row = '\n%s\t| %s\t| %s  \t\t| %s \t\t| %s  \t\t| %s \t\t| %s     \t\t| %s \t\t| ' % (
+								# 	d, t, totals['blue_amt'], totals['blue_bets'], totals['red_amt'],
+								# 	totals['red_bets'], my_bet, my_team)
+								# f.write(new_row)
+								# f.flush()
+
+								print('Betting has ended')
+								print('--------------------')
+								print('Your bet: !%s %s' % (my_team, my_bet))
+
+								payout = 0.0
+								if my_team == 'blue':
+									payout = my_bet / totals['blue_amt'] * totals['red_amt']
+								else:
+									payout = my_bet / totals['red_amt'] * totals['blue_amt']
+								print('Your payout: %s mushrooms' % (payout))
 
 								# Set all globals back to zero.
 								totals = {'blue_amt': 0, 'blue_bets': 0, 'red_amt': 0, 'red_bets': 0}
@@ -161,8 +195,6 @@ class Main:
 								time_since_first_bet = 0
 								bet_complete = False
 								betting_started = False
-
-								print('Betting has ended\n')
 
 				########################################
 				# Handle messages sent by your account #
