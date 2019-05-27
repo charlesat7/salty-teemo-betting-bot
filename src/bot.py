@@ -1,12 +1,11 @@
-import os
-import time
-import math
 import random
-import lib.irc as irc_
+import src.lib.irc as irc_
 from datetime import datetime
 from subprocess import Popen, PIPE
-from lib.functions_general import *
-import lib.functions_commands as commands
+import src.lib.gameinfo as gameinfo
+from src.lib.functions_general import *
+import src.lib.functions_commands as commands
+
 
 class Main:
 	def __init__(self, config):
@@ -15,6 +14,8 @@ class Main:
 		self.socket = self.irc.get_irc_socket_object()
 
 	def run(self):
+		global f, higher, lower, time_since_first_bet, blue, red
+
 		irc = self.irc
 		sock = self.socket
 		config = self.config
@@ -22,17 +23,14 @@ class Main:
 		# Initialize reusable properties.
 		totals = {'blue_amt': 0, 'blue_bets': 0, 'red_amt': 0, 'red_bets': 0}
 		timers = {'!collect': time.time(), 'first_bet': time.time()}
-		higher = lower = {}
+		verbal_alert = True
 		bet_complete = False
 		betting_started = False
-		my_bet = 0
-		my_team = ''
-		verbalAlert = True
+		my_balance = 0
+		my_last_balance = 0
 
 		if config['log_statistics']:
 			f = open(config['statistics_file'], 'a+')
-
-		prev_time_int = 0
 
 		while True:
 			time_since_collect = int(time.time() - timers['!collect'])
@@ -43,36 +41,6 @@ class Main:
 				irc.send_message(channel, '!collect')
 				timers['!collect'] = time.time()
 
-			# Wait until 160 seconds has passed to bet.
-			if time_since_first_bet >= 160 and betting_started and not bet_complete:
-				# Check which team is in the lead.
-				blue = {'name': 'blue', 'amt': totals['blue_amt'], 'bets': totals['blue_bets']}
-				red = {'name': 'red', 'amt': totals['red_amt'], 'bets': totals['red_bets']}
-				if red['amt'] > blue['amt']:
-					higher = red
-					lower = blue
-				else:
-					higher = blue
-					lower = red
-
-				x = lower['amt']
-				y = x / 20
-				if y < 500:
-					y = random.randint(500, 800)
-				elif y >= 1500:
-					y = random.randint(1200, 1500)
-
-				my_bet = int(y)
-				my_team = lower['name']
-
-				# Send the message and record the bet.
-				irc.send_message(channel, '!%s %s' % (my_team, my_bet))
-				print(
-					'--------------------------------\nBET COMPLETE: !%s %s\n--------------------------------'
-					% (my_team, my_bet))
-				bet_complete = True
-				betting_started = False
-
 			data = sock.recv(2048).rstrip()
 
 			# Check if the script is still connected to IRC.
@@ -82,6 +50,34 @@ class Main:
 
 			# Check for PING; reply with PONG.
 			irc.check_for_ping(data)
+
+			# Wait until 170 seconds has passed to bet.
+			if time_since_first_bet > 170 and betting_started and not bet_complete:
+				# Check which team is in the lead.
+				blue = {'name': 'blue', 'amt': totals['blue_amt'], 'bets': totals['blue_bets']}
+				red = {'name': 'red', 'amt': totals['red_amt'], 'bets': totals['red_bets']}
+
+				if red['amt'] > blue['amt']:
+					higher = red
+					lower = blue
+				else:
+					higher = blue
+					lower = red
+
+				my_team = lower['name']
+
+				# Bet using a fixed rate.
+				my_bet = random.randint(3000, 3009)
+				if my_bet > lower['amt']:
+					my_bet = lower['amt']
+
+				# Send the message and record the bet.
+				irc.send_message(channel, '!%s %s' % (my_team, my_bet))
+				print('--------------------------------')
+				print('BET COMPLETE: !%s %s' % (my_team, my_bet))
+				print('--------------------------------')
+				bet_complete = True
+				betting_started = False
 
 			# Check if most recent data is a message from Twitch chat.
 			if irc.check_for_message(data):
@@ -97,7 +93,7 @@ class Main:
 				if username != config['username']:
 					# Message was sent by @xxsaltbotxx.
 					if username == 'xxsaltbotxx':
-						# Message contains 'bet complete for'.
+						# Message contains 'bet complete'.
 						if 'Bet complete' in message:
 							# This is the first bet of the game.
 							if totals['blue_amt'] == 0 and totals['red_amt'] == 0:
@@ -105,19 +101,10 @@ class Main:
 								time_since_first_bet = 0
 								betting_started = True
 
-								# Set focus to the Twitch tab in Chrome.
-								p = Popen(['osascript', '-'], stdin=PIPE, stdout=PIPE, stderr=PIPE)
-								p.communicate('''
-									tell application "Google Chrome"
-										activate
-										set active tab index of first window to 2
-									end tell
-								''')
-
 								# Send a message using Messages.app.
 								args = [
 									'6262099242',
-									'{} - A new game has started!'.format(datetime.now().strftime("%I:%M %p"))
+									'%s - A new game has started!' % datetime.now().strftime("%I:%M %p")
 								]
 								p_message = Popen(
 									['osascript', '-'] + args,
@@ -137,7 +124,7 @@ class Main:
 								''')
 
 								# Verbally notify that a game has started.
-								if verbalAlert:
+								if verbal_alert:
 									Popen('say a game is starting'.split())
 
 							# Parse values from xxsaltbotxx's message.
@@ -154,40 +141,54 @@ class Main:
 								totals['red_bets'] += 1
 
 							print('Time since first bet: %s s' % time_since_first_bet)
-							print('Blue: \t%s shrooms, %s bets' %
-													("{:,}".format(totals['blue_amt']), totals['blue_bets']))
-							print('Red: \t%s shrooms, %s bets\n' %
-													("{:,}".format(totals['red_amt']), totals['red_bets']))
+							print('Blue: \t%s shrooms, %s bets' % ("{:,}".format(totals['blue_amt']), totals['blue_bets']))
+							print('Red: \t%s shrooms, %s bets\n' % ("{:,}".format(totals['red_amt']), totals['red_bets']))
 
 							# The bet was made by myself.
-							if '@Chuby1Tubby' in message:
+							if 'chuby1tubby' in message.lower():
 								bet_complete = True
 								betting_started = False
 								my_team = team
 								my_bet = amt
 
+								# Get the balance from after my bet.
+								balance_str = message.split('Your new balance is ')[1].split('.')[0]
+								my_balance = int(balance_str) + my_bet
+								print('\n----------------------------------------------')
+								print('My balance: %s mushrooms (before bet)' % my_balance)
+								print('----------------------------------------------')
+
+								# Analyze the balance.
+								balance_diff = my_balance - my_last_balance
+								if balance_diff > 0 and my_last_balance:
+									# Most recent bet was a win (unless I collected 2000+ mushrooms).
+									print('----------------------------------')
+									print('Previous game was a win! (%s --> %s)' % (my_last_balance, my_balance))
+									print('----------------------------------\n')
+
+								my_last_balance = my_balance
+						
 						# Message contains 'Betting has ended' or over 3 minutes has passed.
 						if 'Betting has ended' in message or time_since_first_bet >= 240:
 							if totals['blue_amt'] != 0 and totals['red_amt'] != 0:
 								# Log data to a text file.
-								# d = datetime.now().strftime('%Y-%m-%d')
-								# t = datetime.now().strftime('%I:%M%p')
-								# new_row = '\n%s\t| %s\t| %s  \t\t| %s \t\t| %s  \t\t| %s \t\t| %s     \t\t| %s \t\t| ' % (
-								# 	d, t, totals['blue_amt'], totals['blue_bets'], totals['red_amt'],
-								# 	totals['red_bets'], my_bet, my_team)
-								# f.write(new_row)
-								# f.flush()
+								dt = datetime.now()
+								new_row = '\n%s\t| %s  \t\t| %s \t\t| %s  \t\t| %s \t\t| %s \t\t| %s     \t| %s \t\t| ' % (
+									dt, totals['blue_amt'], totals['blue_bets'], totals['red_amt'],
+									totals['red_bets'], my_balance, my_bet, my_team)
+								f.write(new_row)
+								f.flush()
 
 								print('Betting has ended')
 								print('--------------------')
 								print('Your bet: !%s %s' % (my_team, my_bet))
 
-								payout = 0.0
 								if my_team == 'blue':
-									payout = my_bet / totals['blue_amt'] * totals['red_amt']
+									payout = int(float((float(my_bet) / float(totals['blue_amt']))) * float(totals['red_amt']))
+									print('%s / %s * %s = %s' % (my_bet, totals['blue_amt'], totals['red_amt'], payout))
 								else:
-									payout = my_bet / totals['red_amt'] * totals['blue_amt']
-								print('Your payout: %s mushrooms' % (payout))
+									payout = int(float((float(my_bet) / float(totals['red_amt']))) * float(totals['blue_amt']))
+									print('%s / %s * %s = %s' % (my_bet, totals['red_amt'], totals['blue_amt'], payout))
 
 								# Set all globals back to zero.
 								totals = {'blue_amt': 0, 'blue_bets': 0, 'red_amt': 0, 'red_bets': 0}
@@ -204,17 +205,20 @@ class Main:
 					if config['log_messages']:
 						ppi(channel, message, username)
 
-					if '!mute' in message:
-						verbalAlert = False
-						print('Alerts muted.')
-					elif '!unmute' in message:
-						verbalAlert = True
-						print('Alerts unmuted.')
+					if '!collect' in message:
+						timers['!collect'] = time.time()
 
-					if '!skip' in message:
-						bet_complete = True
-						print('Skipping the current round.')
-						irc.send_message(channel, '@chuby1tubby Betting paused until next round.')
+					if '!mute' in message:
+						verbal_alert = False
+
+					if '!unmute' in message:
+						verbal_alert = True
+
+					if '!names' in message:
+						names_list = gameinfo.getChampionNames()
+						names_str = ', '.join(names_list)
+						result = '@Chuby1Tubby I found these champions in the match: ' + names_str
+						irc.send_message(channel, result)
 
 					# Check if the message is a command (i.e. starts with "!{command}").
 					if commands.is_valid_command(message) or commands.is_valid_command(message.split(' ')[0]):

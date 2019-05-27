@@ -147,8 +147,9 @@ CHAMPIONS = {
 	245: 'Ekko',
 	254: 'Vi',
 	266: 'Aatrox',
-	267: 'Nami', #?
+	267: 'Nami',
 	268: 'Azir',
+	350: 'Yuumi',
 	412: 'Thresh',
 	420: 'Illaoi',
 	421: 'Rek\'Sai',
@@ -158,6 +159,7 @@ CHAMPIONS = {
 	497: 'Rakan',
 	498: 'Xayah',
 	516: 'Ornn',
+	517: 'Sylas',
 	518: 'Neeko',
 	555: 'Pyke'
 }
@@ -174,11 +176,6 @@ options = Options()
 options.headless = True
 browser = webdriver.Chrome(chrome_options=options)
 
-# General variables
-prev_url = ""
-curr_url = ""
-first_iteration = True
-
 
 
 #############
@@ -187,120 +184,55 @@ first_iteration = True
 
 
 def fetchHtml(url, delay):
-	''' Fetch HTML Function
-	
-	Uses Selenium to grab the HTML contents of a web page,
-	then passes the HTML, as BeautifulSoup, to `parseHtml()`.
-
-	:param url: 	The url of the web page to grab HTML from.
-	:param delay: 	The amount of seconds to wait for the page contents to finish loading.
-	'''
-
 	browser.get(url)
-
 	time.sleep(0.5)
-	if (browser.current_url == "https://ezre.al/error/GAME_NOT_FOUND"):
-		print('Yo, there isn\'t a game playing right now.')
+
+	if 'GAME_NOT_FOUND' in browser.current_url:
 		return
 
-	html = ""
-
+	html = ''
 	try:
-		# Search for an element.
+		# Search for any 'b' elements and return False if none found.
 		element_present = EC.presence_of_element_located((By.TAG_NAME, 'b'))
+
+		# Wait until element_present is True.
 		WebDriverWait(browser, delay).until(element_present)
 
-		# Return page HTMl.
 		html = browser.page_source
-	except TimeoutException:
-		print("Loading timed out.")
+	except Exception as e:
+		pass
 
 	browser.quit()
+	browser.close()
 
-	if (html):
-		soup = BeautifulSoup(html, 'html.parser')
-		parseHtml(soup)
-	else:
-		print('No game info found.')
+	return html
 
-def parseHtml(soup):
-	''' Parse HTML Function
+def getChampionNames():
+	soup = None
+	champion_names = []
+	html = fetchHtml(GAME_INFO_URL, 10)
 
-	Uses BeautifulSoup to make an array of all `tr` elements on the page,
-	then calculates the average win-rate of both the Blue and Red teams.
+	if not html:
+		print("No HTML")
+		return ['lol nope']
 
-	:param soup: 	The BeautifulSoup object passed in from a successful HTML retrieval in `fetchHtml()`.
-	'''
+	soup = BeautifulSoup(html, 'html.parser')
 
-	rows = soup.find_all(['tr'])
+	table_rows = soup.find_all(['tr'])
 
-	blue_total = 0.0
-	red_total = 0.0
-	blue_count = 0.0
-	red_count = 0.0
-
-	for i, row in enumerate(rows):
-		if i == 0:
+	for i, row in enumerate(table_rows):
+		if i == 0: 
 			continue
-		elif i == 1:
-			print('Blue Champions:')
-		elif i == 6:
-			print('\nRed Champions:')
 
 		champion_img_uri = row.find('img', class_='champion')['src']
 		champion_number = int(champion_img_uri.split('champion/')[1].split('.')[0])
+		
 		champion_name = ''
-
 		try:
 			champion_name = CHAMPIONS[champion_number]
 		except:
 			champion_name = 'Unknown'
-			pass
-		print(champion_name)
 
-		percentages = row.find_all(['b'])
+		champion_names.append(champion_name)
 
-		player_total = 0.0
-		player_count = 0.0
-		player_average = 0.0
-
-		# Calculate player total.
-		for percentage in percentages:
-			num = float(percentage.text.split('%')[0])
-			if num:
-				player_total += num
-				player_count += 1.0
-
-		# Calculate player average.
-		if player_count:
-			player_average = player_total / player_count
-
-		# Update team totals.
-		if player_average:
-			if i <= 5:
-				blue_total += player_average
-				blue_count += 1.0
-			else:
-				red_total += player_average
-				red_count += 1.0
-
-	# Calculate team averages.
-	if not blue_count:
-		blue_count = 1
-	if not red_count:
-		red_count = 1
-	blue_average = round(blue_total / blue_count, 2)
-	red_average = round(red_total / red_count, 2)
-
-	print('\nAverage Win Rates:')
-	print("Blue Average: {}%".format(blue_average))
-	print("Red Average: {}%".format(red_average))
-
-
-
-########
-# Main #
-########
-
-
-fetchHtml(GAME_INFO_URL, 10)
+	return champion_names
