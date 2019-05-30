@@ -2,15 +2,20 @@ Salty Teemo Betting Bot
 ==========
 
 This is a fork of the twitch-bot made by aidanrwt: https://github.com/aidanrwt/twitch-bot
+
 It is a simple Twitch chat/irc bot written in Python 2.7.16, modified to interact with the Salty Teemo channel.
 
 Getting Started
 ============
+
 * Ensure your system has Python 2.7 installed: `python --version`
-* Install the `requests` package: `pip install requests`
-* Clone the Git repository: `git clone https://github.com/knakamura13/salty-teemo-betting-bot`
+  * I used Python 2.7.16 for this project.
+  * If you need to install Python 2.7.16:
+    * Windows: https://www.python.org/ftp/python/2.7.16/python-2.7.16.amd64.msi
+    * Mac: https://www.python.org/ftp/python/2.7.16/python-2.7.16-macosx10.9.pkg
+* Clone this git repository: `git clone https://github.com/knakamura13/salty-teemo-betting-bot`
 * Replace all of the placeholders in `config.py` with your own username, oauth token, channels, etc.
-* Make the serve.py script executable: `chmod +x /serve.py`
+* Make the serve.py script executable: `chmod +x serve.py`
 * Run the serve.py script: `./serve.py` or `python serve.py`
 
 Adding your own commands
@@ -27,8 +32,8 @@ Place the string you wish to be returned to the user in the `return` parameter. 
 
 ```python
 '!hello': {
-	'limit': 10,
-	'return': 'Hello from the Python code!'
+    'limit': 10,
+    'return': 'Hello from the Python code!'
 }
 ```
 
@@ -40,9 +45,9 @@ This command is already created for you:
 
 ```python
 '!rand': {
-		'limit': 10,
-		'argc': 2,
-		'return': 'command'
+    'limit': 10,
+    'argc': 2,
+    'return': 'command'
 }
 ```
 
@@ -52,21 +57,15 @@ And then in `lib/commands/_rand.py`, you will find the following:
 import random
 
 def _rand(args):
-	min = int(args[0])
-	max = int(args[1])
-	
-	try:
-		return '%s' % random.randint(min, max)
-	except ValueError:
-		return '!random <min> <max> (use full integers)'
-	except:
-		return '!random <min> <max>'
+    min = int(args[0])
+    max = int(args[1])
+    
+    try:
+        return '%s' % random.randint(min, max)
+    except ValueError:
+        return '!random <min> <max> (use full integers)'
+    except:
+        return '!random <min> <max>'
 ```
 
 Now, if a user types `!rand 5 10` into the Twitch chat, the bot will respond with a number between 5 and 10.
-
-
-Betting in Salty Teemo
-======================
-
-Betting is handled by the file `bot.py`.

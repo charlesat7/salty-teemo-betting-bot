@@ -66,10 +66,16 @@ class Main:
 
 				my_team = lower['name']
 
-				# Bet using a fixed rate.
-				my_bet = random.randint(3000, 3009)
+				# Calculate my bet amount.
+				my_bet = random.randint(5000, 5005)
 				if my_bet > lower['amt']:
+					# My bet is needlessly large.
 					my_bet = lower['amt']
+				elif int(higher['amt'] - lower['amt']) < 5000:
+					# My bet would tip the scales.
+					my_bet = random.randint(3000, 3005)
+					if int(higher['amt'] - lower['amt']) < 1000:
+						my_bet = random.randint(1000, 3005)
 
 				# Send the message and record the bet.
 				irc.send_message(channel, '!%s %s' % (my_team, my_bet))
