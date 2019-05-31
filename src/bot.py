@@ -14,7 +14,7 @@ class Main:
 		self.socket = self.irc.get_irc_socket_object()
 
 	def run(self):
-		global f, higher, lower, time_since_first_bet, blue, red
+		global f, higher, lower, time_since_first_bet, blue, red, my_bet
 
 		irc = self.irc
 		sock = self.socket
@@ -131,7 +131,8 @@ class Main:
 
 								# Verbally notify that a game has started.
 								if verbal_alert:
-									Popen('say a game is starting'.split())
+									# Popen('say a game is starting'.split())
+									Popen('afplay teemo.mp3'.split())
 
 							# Parse values from xxsaltbotxx's message.
 							split = message.split(' - Bet complete for ')[1].split(', ')
