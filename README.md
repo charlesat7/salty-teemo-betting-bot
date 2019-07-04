@@ -65,8 +65,39 @@ def _rand(args):
 
 Now, if a user types `!rand 5 10` into the Twitch chat, the bot will respond with a number between 5 and 10.
 
+Notice that both the filename and the function name are `_rand`. Each command should have a new file named `_commandName.py` with a single function `_commandName(args)`, where `commandName` is the phrase that will trigger the command from Twitch chat, i.e. `!commandName`. The underscores ensure that the function name will not overwrite existing python functions/methods.
+
 
 Betting in Salty Teemo
 ======================
 
-Betting is handled by the file `bot.py`.
+The code that determines which team to bet on and how many mushrooms to bet is the following:
+```
+# bot.py lines 65-67:
+
+# Bet on the underdog.
+underdog = lower['name']
+bet = int(y)
+```
+where `y` is calculated beforehand using a basic algorithm. You can replace `int(y)` with any integer to change how much you want to bet.
+
+
+Reading other peoples' messages
+===============================
+The relevant code here is the following:
+```
+# bot.py lines 93-98:
+
+#######################################
+# Handle messages sent by other users #
+#######################################
+if username != config['username']:
+	# Message was sent by @xxsaltbotxx.
+	if username == 'xxsaltbotxx':
+```
+where `xxsaltbotxx` is a specific user that is being tracked. 
+If you want to print out all messages from someone with the username `twitchuser12`, you can add this code as an additional `if` statement:
+```
+	if username == 'twitchuser12':
+		print('%s says: %s' % (username, mesage))
+```
