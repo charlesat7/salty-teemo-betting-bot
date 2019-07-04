@@ -40,9 +40,9 @@ This command is already created for you:
 
 ```python
 '!rand': {
-		'limit': 10,
-		'argc': 2,
-		'return': 'command'
+	'limit': 10,
+	'argc': 2,
+	'return': 'command'
 }
 ```
 
