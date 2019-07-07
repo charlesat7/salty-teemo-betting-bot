@@ -9,7 +9,7 @@ Getting Started
 * Ensure your system has Python 2.7 installed: `python --version`
 * Install the `requests` package: `pip install requests`
 * Clone the Git repository: `git clone https://github.com/knakamura13/salty-teemo-betting-bot`
-* Replace all of the placeholders in `config.py` with your own username, oauth token, channels, etc.
+* Replace all of the placeholders in `src/config/config.py` with your own username, oauth token, channels, etc.
 * Make the serve.py script executable: `chmod +x serve.py`
 * Run the serve.py script: `./serve.py` or `python serve.py`
 
