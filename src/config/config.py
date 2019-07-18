@@ -13,10 +13,4 @@ config = {
 
 	# Display user messages from Twitch Chat.
 	'log_messages': True,
-
-	# Log betting statistics from chat to a text file.
-	'log_statistics': True,
-
-	# Select where statistics will be saved on the device.
-	'statistics_file': 'stats.txt'
 }

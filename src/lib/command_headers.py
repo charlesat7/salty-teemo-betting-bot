@@ -1,19 +1,18 @@
 from src.config.config import *
 
 commands = {
+	# The simplest form of a command that returns a string to chat.
 	'!test': {
 		'limit': 5,
-		'return': '@%s I hear you MrDestructoid' % config['username']
+		'return': '@%s I hear you ' % config['username']
 	},
-	'!beemo': {
-		'limit': 5,
-		'return': '@Chuby1Tubby Fact: beemo is the cutest champion in the whole world <3.'
-	},
+	# An example of a complex command that executes a REST API call.
 	'!catfact': {
 		'limit': 10,
 		'argc': 0,
 		'return': 'command'
 	},
+	# An example of a simple command that takes two arguments.
 	'!rand': {
 		'limit': 10,
 		'argc': 2,

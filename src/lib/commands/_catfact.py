@@ -1,12 +1,11 @@
 import requests
 import json
+from src.config.config import *
 
-def _catfact(username='chuby1tubby'):
+
+def _catfact(username=config['username']):
 	url = 'https://catfact.ninja/facts'
-
-	params = dict(
-		language='en'
-	)
+	params = dict(language='en')
 
 	data = requests.get(url=url, params=params)
 	binary = data.content
@@ -14,4 +13,4 @@ def _catfact(username='chuby1tubby'):
 
 	fact = result['data'][0]['fact']
 
-	return '@' + username + ' did you know: ' + fact 
+	return '@%s did you know: %s' % (username, fact)
