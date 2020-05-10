@@ -2,7 +2,7 @@ global config
 
 config = {
 	# Username must be all lowercase.
-	'username': 'mytwitchusername',
+	'username': 'voidlingrealms',
 
 	# Get your password from http://twitchapps.com/tmi/.
 	'oauth_password': 'oauth:oauthd20vwpd7ud7gr79gf4ku1ubmvmg5k5',
